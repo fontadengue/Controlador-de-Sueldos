@@ -106,9 +106,7 @@ const App: React.FC = () => {
             </div>
             <h1 className="text-xl font-bold tracking-tight">Auditador de Recibos de Sueldo</h1>
           </div>
-          <div className="text-sm text-gray-500 hidden sm:block">
-            Control de Deducciones
-          </div>
+          {/* Removed "Control de Deducciones" text */}
         </div>
       </header>
 
@@ -158,11 +156,7 @@ const App: React.FC = () => {
                 Comenzar auditoría
               </button>
             )}
-            {file && processingState.status !== 'processing' && (
-              <p className="text-xs text-gray-400">
-                Modo Rápido: Se analizan solo páginas impares (1, 3, 5...) asumiendo duplicados en pares.
-              </p>
-            )}
+            {/* Removed "Modo Rápido" text */}
           </div>
 
           {/* Progress Bar */}
