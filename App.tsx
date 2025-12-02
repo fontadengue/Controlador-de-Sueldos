@@ -120,7 +120,7 @@ const App: React.FC = () => {
             Auditoría de Haberes
           </h2>
           <p className="text-gray-600 text-lg">
-            Sube tu PDF con los recibos de sueldo. El sistema analizará solo los originales (páginas impares) para mayor velocidad y verificará la jubilación.
+            Sube tu PDF
           </p>
         </div>
 
