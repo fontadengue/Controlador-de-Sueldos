@@ -1,5 +1,5 @@
 {
-  "name": "AuditCheck: Controlador de Recibos",
-  "description": "Una aplicación para auditar recibos de sueldo mediante IA, verificando cálculos de jubilación y detectando inconsistencias en archivos PDF.",
+  "name": "Auditador de Recibos de Sueldo",
+  "description": "Una aplicación para auditar recibos de sueldo, verificando cálculos de jubilación y detectando inconsistencias en archivos PDF.",
   "requestFramePermissions": []
 }

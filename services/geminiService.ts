@@ -132,18 +132,18 @@ export const analyzeReceiptImage = async (base64Image: string, pageNumber: numbe
         Number((totalHaberes * 0.03).toFixed(2))
     );
 
-    // --- 3. Validate Code 0307 (3% of Total Haberes) ---
+    // --- 3. Validate Code 0307 ((3% of Total Haberes) * 2) ---
     const res0307 = validateCode(
         !!data.hasCode0307,
         data.code0307Deduction || 0,
-        Number((totalHaberes * 0.03).toFixed(2))
+        Number(((totalHaberes * 0.03) * 2).toFixed(2))
     );
 
-    // --- 4. Validate Code 0322 (2% of Total Haberes + NonRemunerative) ---
+    // --- 4. Validate Code 0322 ((2% of Total Haberes + NonRemunerative) * 2) ---
     const res0322 = validateCode(
         !!data.hasCode0322,
         data.code0322Deduction || 0,
-        Number((totalBaseWithNonRem * 0.02).toFixed(2))
+        Number(((totalBaseWithNonRem * 0.02) * 2).toFixed(2))
     );
 
     // --- 5. Validate Code 0332 (0.5% of Total Haberes + NonRemunerative) ---

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UploadCloud, FileType, RefreshCw, CheckCircle, AlertTriangle, Loader2, Zap } from 'lucide-react';
+import { UploadCloud, FileType, RefreshCw, CheckCircle, AlertTriangle, Loader2, Zap, BarChart3 } from 'lucide-react';
 import { convertPdfToImages } from './utils/pdfUtils';
 import { analyzeReceiptImage } from './services/geminiService';
 import { AuditResult, ProcessingState } from './types';
@@ -29,7 +29,7 @@ const App: React.FC = () => {
       
       const images = await convertPdfToImages(file);
       
-      setProcessingState({ status: 'processing', progress: 20, currentStep: 'Analizando recibos con IA...' });
+      setProcessingState({ status: 'processing', progress: 20, currentStep: 'Analizando recibos...' });
 
       const totalImages = images.length;
       let completedCount = 0;
@@ -99,13 +99,14 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-brand-700">
-            <div className="bg-brand-600 text-white p-1.5 rounded-lg">
-              <FileType size={24} />
+          <div className="flex items-center gap-3 text-brand-700">
+            {/* Logo recreado con CSS/Icono para evitar enlaces rotos y asegurar carga rapida */}
+            <div className="h-10 w-10 rounded-full bg-gray-900 flex items-center justify-center border border-yellow-600 shadow-sm shrink-0">
+               <BarChart3 className="text-yellow-500 h-6 w-6" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight">AuditCheck</h1>
+            <h1 className="text-xl font-bold tracking-tight">Auditador de Recibos de Sueldo</h1>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 hidden sm:block">
             Control de Deducciones
           </div>
         </div>
@@ -116,7 +117,7 @@ const App: React.FC = () => {
         {/* Intro Section */}
         <div className="text-center max-w-2xl mx-auto">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Auditoría Inteligente de Haberes
+            Auditoría de Haberes
           </h2>
           <p className="text-gray-600 text-lg">
             Sube tu PDF con los recibos de sueldo. El sistema analizará solo los originales (páginas impares) para mayor velocidad y verificará la jubilación.
@@ -154,7 +155,7 @@ const App: React.FC = () => {
                 className="mt-4 inline-flex items-center gap-2 px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-brand-600 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-colors"
               >
                 <Zap size={20} className="text-yellow-300" />
-                Comenzar Auditoría Rápida
+                Comenzar auditoría
               </button>
             )}
             {file && processingState.status !== 'processing' && (
