@@ -15,7 +15,8 @@ export const convertPdfToImages = async (file: File): Promise<string[]> => {
   // Render pages in parallel using Promise.all
   const imagePromises = pageNumbers.map(async (pageNum) => {
     const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 1.5 }); // Scale 1.5 for better OCR resolution
+    // Increased scale to 2.0 for better OCR accuracy on small text/numbers
+    const viewport = page.getViewport({ scale: 2.0 });
 
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
@@ -29,9 +30,9 @@ export const convertPdfToImages = async (file: File): Promise<string[]> => {
       viewport: viewport,
     } as any).promise;
 
-    // Convert to base64 string (remove data:image/jpeg;base64, prefix for Gemini)
-    // Using JPEG with 0.8 quality for smaller payload size but good text clarity
-    const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+    // Convert to base64 string using PNG (lossless) for maximum clarity
+    // This helps significantly with number extraction compared to JPEG
+    const base64 = canvas.toDataURL('image/png').split(',')[1];
     return base64;
   });
 

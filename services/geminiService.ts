@@ -15,7 +15,8 @@ const getApiKey = () => {
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
-const MODEL_NAME = 'gemini-3-pro-preview';
+// Switched to gemini-2.5-flash for faster and more reliable document OCR
+const MODEL_NAME = 'gemini-2.5-flash';
 
 export const analyzeReceiptImage = async (base64Image: string, pageNumber: number): Promise<AuditResult> => {
   try {
@@ -25,35 +26,38 @@ export const analyzeReceiptImage = async (base64Image: string, pageNumber: numbe
         parts: [
           {
             inlineData: {
-              mimeType: 'image/jpeg',
+              mimeType: 'image/png', // Changed to PNG to match utils
               data: base64Image
             }
           },
           {
-            text: `Analiza este recibo de sueldo.
+            text: `Analiza este recibo de sueldo. Es una imagen de alta resolución.
             
-            PASO 1: VERIFICACIÓN PREVIA
-            Busca si existe el concepto de descuento "Jubilación" (puede aparecer como "JUBILACION", "JUBIL.", cód 11, etc).
-            Si NO existe ningún concepto de Jubilación en la columna de descuentos/retenciones, debes marcar "hasJubilacion" como false.
+            PASO 1: VERIFICACIÓN DE JUBILACIÓN
+            Busca en la columna de CONCEPTOS o DETALLE si existe algún item relacionado con "Jubilación" (ej: "JUBILACION", "JUBIL.", cód 11, etc).
+            - Si NO encuentras absolutamente nada relacionado con jubilación, marca "hasJubilacion" como false.
+            - Si encuentras el concepto, marca "hasJubilacion" como true.
             
-            PASO 2: EXTRACCIÓN (Solo si hasJubilacion es true)
-            Extrae:
-            1. Nombre del empleado.
-            2. Total de haberes (bruto remunerativo sujeto a retenciones). Suele estar en columna 'Haberes' o 'Total Haberes'.
-            3. Total de haberes sin descuento (No remunerativo). Suele estar en columna 'Haberes S/Desc' o 'Tot. Hab.s/Desc.'. Si está vacío, asume 0.
-            4. Monto deducido por 'Jubilación'.
-            5. Busca en la columna 'Código' los siguientes números y extrae el monto de la columna 'Deducciones':
-               - "0302"
-               - "0307"
-               - "0322"
-               - "0332"
+            PASO 2: EXTRACCIÓN DE DATOS (Si hasJubilacion es true)
+            Extrae con precisión:
+            1. "employeeName": Nombre completo del empleado (generalmente arriba).
+            2. "totalHaberes": La suma total de los haberes REMUNERATIVOS (sujeto a descuentos). Busca la columna "Haberes" o el total abajo "Total Haberes".
+            3. "totalNonRemunerative": La suma de los haberes NO REMUNERATIVOS. Busca columna "Haberes S/Desc", "No Remun", o "Tot. Hab.s/Desc.". Si la columna está vacía o es 0.00, retorna 0.
+            4. "jubilacionDeduction": El importe exacto descontado por el concepto de Jubilación.
             
-            IMPORTANTE - FORMATO NUMÉRICO ARGENTINA:
-            - El punto (.) es separador de miles.
-            - La coma (,) es separador decimal.
-            Ejemplo: "1.800.000,00" -> conviértelo al número flotante 1800000.00
+            PASO 3: CÓDIGOS ESPECÍFICOS
+            Busca en la columna "Código" (generalmente la primera columna a la izquierda) los siguientes números exactos. Si los encuentras, extrae el importe de la columna "Deducciones":
+               - Código "0302" -> extraer "code0302Deduction"
+               - Código "0307" -> extraer "code0307Deduction"
+               - Código "0322" -> extraer "code0322Deduction"
+               - Código "0332" -> extraer "code0332Deduction"
             
-            Retorna los números como flotantes puros.`
+            IMPORTANTE - FORMATO DE NÚMEROS (ARGENTINA):
+            - El punto (.) separa miles (ej: 1.000 es mil).
+            - La coma (,) separa decimales (ej: 50,00 es cincuenta).
+            - Debes convertir "1.800.000,00" a 1800000.00 para el JSON.
+            - Si un campo no existe o está vacío, devuélvelo como null o 0, no inventes números.
+            `
           }
         ]
       },
