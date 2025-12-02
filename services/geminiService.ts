@@ -1,9 +1,19 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuditResult } from "../types";
 
+// Safe API Key access for browser environment
+// Uses the provided key as fallback to work autonomously on Vercel
+const getApiKey = () => {
+  // Check if process.env exists (Node/Build env)
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  // Fallback to the provided key for autonomous operation
+  return 'AIzaSyCHwXcjz96BN-UkLY9-7pzH5wY-xSQISkA';
+};
+
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 const MODEL_NAME = 'gemini-3-pro-preview';
 
