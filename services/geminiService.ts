@@ -121,6 +121,9 @@ export const analyzeReceiptImage = async (base64Image: string, pageNumber: numbe
     const totalNonRemunerative = data.totalNonRemunerative || 0;
     const totalBaseWithNonRem = totalHaberes + totalNonRemunerative;
     
+    // Critical check: Zero salary
+    const isZeroSalary = totalHaberes === 0;
+
     // --- 1. Validate Jubilacion (11% of Total Haberes) ---
     const actualJubilacion = data.jubilacionDeduction || 0;
     const expectedJubilacion = Number((totalHaberes * 0.11).toFixed(2));
@@ -170,6 +173,7 @@ export const analyzeReceiptImage = async (base64Image: string, pageNumber: numbe
 
     // Overall Status
     const isOverallCorrect = 
+        !isZeroSalary && // Fail if salary is 0
         isJubilacionCorrect && 
         res0302.isCorrect && 
         res0307.isCorrect && 

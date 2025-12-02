@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AuditResult } from '../types';
 import { CheckCircle2, XCircle, AlertTriangle, FileText } from 'lucide-react';
@@ -9,6 +8,7 @@ interface Props {
 
 export const AnalysisResult: React.FC<Props> = ({ result }) => {
   const isError = !result.isCorrect;
+  const isZeroSalary = result.totalHaberes === 0;
 
   const renderCodeValidation = (
     label: string, 
@@ -69,6 +69,18 @@ export const AnalysisResult: React.FC<Props> = ({ result }) => {
           {isError ? 'Revisar' : 'Aprobado'}
         </div>
       </div>
+
+      {/* GIANT WARNING FOR ZERO SALARY */}
+      {isZeroSalary && (
+        <div className="mb-6 p-6 bg-red-600 rounded-xl shadow-lg border-4 border-red-800 animate-pulse">
+          <div className="flex flex-col items-center text-center text-white">
+            <AlertTriangle size={48} className="mb-2" />
+            <h2 className="text-2xl font-black uppercase tracking-wider">¡ADVERTENCIA CRÍTICA!</h2>
+            <p className="text-lg font-bold mt-1">EL TOTAL DE HABERES ES $0.00 O NO SE PUDO LEER</p>
+            <p className="text-sm opacity-90 mt-2">Revise manualmente este recibo. El sistema no detectó ningún monto remunerativo.</p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white/60 p-3 rounded-lg border border-gray-100 mb-4 grid grid-cols-2 gap-4">
         <div>
@@ -132,7 +144,7 @@ export const AnalysisResult: React.FC<Props> = ({ result }) => {
         )}
       </div>
 
-      {isError && (
+      {isError && !isZeroSalary && (
         <div className="mt-4 flex items-start gap-2 text-xs text-red-700 bg-red-100/50 p-3 rounded-md">
           <AlertTriangle size={16} className="shrink-0 mt-0.5" />
           <p>
