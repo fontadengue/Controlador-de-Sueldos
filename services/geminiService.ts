@@ -156,11 +156,12 @@ export const analyzeReceiptImage = async (base64Image: string, pageNumber: numbe
         Number(((totalHaberes * 0.03) * 2).toFixed(2))
     );
 
-    // --- 4. Validate Code 0322 ((2% of Total Haberes + NonRemunerative) * 2) ---
+    // --- 4. Validate Code 0322 (2% of Total Haberes + NonRemunerative) ---
+    // User requested to remove * 2 multiplier
     const res0322 = validateCode(
         !!data.hasCode0322,
         data.code0322Deduction || 0,
-        Number(((totalBaseWithNonRem * 0.02) * 2).toFixed(2))
+        Number((totalBaseWithNonRem * 0.02).toFixed(2))
     );
 
     // --- 5. Validate Code 0332 (0.5% of Total Haberes + NonRemunerative) ---
