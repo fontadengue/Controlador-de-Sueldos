@@ -125,12 +125,17 @@ const App: React.FC = () => {
         {/* Upload Section */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 text-center transition-all hover:border-brand-300">
           <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="p-4 bg-brand-50 text-brand-600 rounded-full">
-              <UploadCloud size={48} />
-            </div>
-            <div>
-              <label htmlFor="file-upload" className="cursor-pointer">
-                <span className="mt-2 block text-sm font-semibold text-gray-900">
+            
+            <label 
+              htmlFor="file-upload" 
+              className="cursor-pointer flex flex-col items-center justify-center w-full group"
+            >
+              <div className="p-4 bg-brand-50 text-brand-600 rounded-full group-hover:bg-brand-100 transition-colors duration-200">
+                <UploadCloud size={48} />
+              </div>
+              
+              <div className="mt-4">
+                <span className="block text-sm font-semibold text-gray-900">
                   {file ? file.name : "Selecciona un archivo PDF"}
                 </span>
                 <input 
@@ -144,8 +149,8 @@ const App: React.FC = () => {
                 <span className="mt-1 block text-sm text-gray-500">
                   {file ? "Haz clic para cambiar" : "Solo archivos PDF hasta 10MB"}
                 </span>
-              </label>
-            </div>
+              </div>
+            </label>
             
             {file && processingState.status !== 'processing' && (
               <button
