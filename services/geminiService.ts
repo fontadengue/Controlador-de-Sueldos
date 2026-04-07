@@ -18,9 +18,30 @@ const ai = new GoogleGenAI({ apiKey: getApiKey() });
 // Switched to gemini-2.5-flash for faster and more reliable document OCR
 const MODEL_NAME = 'gemini-2.5-flash';
 
+// Retry with exponential backoff to handle rate limit errors (429)
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const generateWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0], maxRetries = 5) => {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (error: any) {
+      const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('rate');
+      if (isRateLimit && attempt < maxRetries - 1) {
+        const waitMs = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s, 16s, 32s
+        console.warn(`Rate limit en intento ${attempt + 1}, reintentando en ${waitMs / 1000}s...`);
+        await sleep(waitMs);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error('Max retries reached');
+};
+
 export const analyzeReceiptImage = async (base64Image: string, pageNumber: number): Promise<AuditResult> => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateWithRetry({
       model: MODEL_NAME,
       contents: {
         parts: [

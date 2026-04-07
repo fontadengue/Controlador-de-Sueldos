@@ -33,7 +33,7 @@ const App: React.FC = () => {
 
       const totalImages = images.length;
       let completedCount = 0;
-      const concurrencyLimit = 5; 
+      const concurrencyLimit = 2; 
       const resultPromises: Promise<AuditResult>[] = [];
       const executing: Promise<void>[] = [];
 
@@ -65,6 +65,8 @@ const App: React.FC = () => {
 
         if (executing.length >= concurrencyLimit) {
           await Promise.race(executing);
+          // Pequeña pausa entre lotes para evitar rate limit
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
 
