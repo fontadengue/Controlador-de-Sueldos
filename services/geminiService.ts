@@ -4,9 +4,9 @@ import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 const MODEL_NAME = 'gemini-2.5-flash';
 
 const AI_KEYS = [
-  'AIzaSyBKSrNzKBeBfQyKUWlySNp507kxVeFpjRk',
-  'AIzaSyCis7WqDy70YmsaKBwGD4eeq41G5g26Q20',
-];
+  import.meta.env.VITE_GEMINI_KEY_1,
+  import.meta.env.VITE_GEMINI_KEY_2,
+].filter(Boolean);
 
 let currentKeyIndex = 0;
 
