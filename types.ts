@@ -1,5 +1,5 @@
 
-export type ConvenioType = 'comercio' | 'sanidad';
+export type ConvenioType = 'comercio' | 'sanidad' | 'vigilancia';
 
 export interface DeductionValidation {
   present: boolean;

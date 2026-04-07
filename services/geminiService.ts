@@ -212,8 +212,8 @@ export const analyzeReceiptImage = async (
   pageNumber: number,
   convenio: ConvenioType = 'comercio'
 ): Promise<AuditResult> => {
-  const prompt = convenio === 'sanidad' ? SANIDAD_PROMPT : COMERCIO_PROMPT;
-  const schema = convenio === 'sanidad' ? SANIDAD_SCHEMA : COMERCIO_SCHEMA;
+  const prompt = convenio === 'sanidad' ? SANIDAD_PROMPT : convenio === 'vigilancia' ? VIGILANCIA_PROMPT : COMERCIO_PROMPT;
+  const schema = convenio === 'sanidad' ? SANIDAD_SCHEMA : convenio === 'vigilancia' ? VIGILANCIA_SCHEMA : COMERCIO_SCHEMA;
 
   try {
     const response = await generateWithRetry({
@@ -259,6 +259,8 @@ export const analyzeReceiptImage = async (
 
     return convenio === 'sanidad'
       ? buildSanidadResult(data, pageNumber)
+      : convenio === 'vigilancia'
+      ? buildVigilanciaResult(data, pageNumber)
       : buildComercioResult(data, pageNumber);
 
   } catch (error: any) {
@@ -393,6 +395,112 @@ const buildSanidadResult = (data: any, pageNumber: number): AuditResult => {
     aportesSindical: { present: false },
     faecys: { present: false },
     cuotaSolidaridad,
+    tieneOsecac: false,
+    esJornadaReducida,
+    isCorrect,
+    status: isCorrect ? 'success' : 'error',
+    skipped: false,
+  };
+};
+
+// ─── VIGILANCIA CCT 426/05 ───────────────────────────────────────────────────
+
+const VIGILANCIA_PROMPT = `Analizá este recibo de sueldo del CCT 426/05 (Vigilancia Privada). Es una imagen de alta resolución.
+
+PASO 1: VERIFICAR JUBILACIÓN
+Buscá el código 0300 (JUBILACION). Si no existe, marcá hasJubilacion=false y no sigas.
+
+PASO 2: DATOS GENERALES
+- employeeName: nombre completo del empleado
+- totalHaberes: valor de "Total Haberes" (columna remunerativa)
+- totalNonRemunerative: valor de "Tot. Hab.s/Desc." o "Total No Remunerativo" (0 si no existe)
+
+PASO 3: TIPO DE JORNADA
+- esJornadaReducida: true si aparece código 0004. false si aparece 0010, 0015 o 0016.
+
+PASO 4: EXTRAER DEDUCCIONES (null si no aparece en el recibo)
+- cod0300_jubilacion: importe del código 0300
+- cod0302_ley19032: importe del código 0302
+- cod0310_obraSocial: importe del código 0310
+- cod0322_aportesSindical: importe del código 0322
+
+FORMATO NUMÉRICO ARGENTINO:
+- El punto (.) separa miles: 1.000 = mil
+- La coma (,) separa decimales: 50,00 = cincuenta
+- Convertí "1.179.320,91" a 1179320.91 en el JSON
+- Si un campo no existe retornarlo como null
+`;
+
+const VIGILANCIA_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    hasJubilacion: { type: Type.BOOLEAN },
+    employeeName: { type: Type.STRING },
+    totalHaberes: { type: Type.NUMBER },
+    totalNonRemunerative: { type: Type.NUMBER },
+    esJornadaReducida: { type: Type.BOOLEAN },
+    cod0300_jubilacion: { type: Type.NUMBER },
+    cod0302_ley19032: { type: Type.NUMBER },
+    cod0310_obraSocial: { type: Type.NUMBER },
+    cod0322_aportesSindical: { type: Type.NUMBER },
+  },
+  required: ['hasJubilacion'],
+};
+
+const buildVigilanciaResult = (data: any, pageNumber: number): AuditResult => {
+  const totalHaberes = data.totalHaberes || 0;
+  const totalNoRem = data.totalNonRemunerative || 0;
+  const esJornadaReducida: boolean = !!data.esJornadaReducida;
+
+  // 0300 - Jubilación: 11% rem
+  const jubilacion = validate(
+    data.cod0300_jubilacion != null,
+    data.cod0300_jubilacion || 0,
+    Number((totalHaberes * 0.11).toFixed(2))
+  );
+
+  // 0302 - Ley 19032: 3% rem
+  const ley19032 = validate(
+    data.cod0302_ley19032 != null,
+    data.cod0302_ley19032 || 0,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  // 0310 - Obra Social: 3% rem
+  const obraSocial = validate(
+    data.cod0310_obraSocial != null,
+    data.cod0310_obraSocial || 0,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  // 0322 - Aporte Sindical: 3% rem (Vigilancia usa 3%, no 2%)
+  const aportesSindical = validate(
+    data.cod0322_aportesSindical != null,
+    data.cod0322_aportesSindical || 0,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  const isZeroSalary = totalHaberes === 0;
+  const isCorrect =
+    !isZeroSalary &&
+    (jubilacion.isCorrect ?? true) &&
+    (ley19032.isCorrect ?? true) &&
+    (obraSocial.isCorrect ?? true) &&
+    (aportesSindical.isCorrect ?? true);
+
+  return {
+    pageNumber,
+    employeeName: data.employeeName || 'Nombre no identificado',
+    convenio: 'vigilancia',
+    totalHaberes,
+    totalNonRemunerative: totalNoRem,
+    jubilacion,
+    ley19032,
+    obraSocial,
+    aporteOsNoRem: { present: false },
+    aportesSindical,
+    faecys: { present: false },
+    cuotaSolidaridad: { present: false },
     tieneOsecac: false,
     esJornadaReducida,
     isCorrect,

@@ -16,6 +16,11 @@ const CONVENIOS: { id: ConvenioType; label: string; description: string }[] = [
     label: 'Empleados de Sanidad',
     description: 'CCT 180/75 — Jubilación, OS, Cuota de Solidaridad',
   },
+  {
+    id: 'vigilancia',
+    label: 'Vigilancia Privada',
+    description: 'CCT 426/05 — Jubilación, OS, Aporte Sindical 3%',
+  },
 ];
 
 const App: React.FC = () => {

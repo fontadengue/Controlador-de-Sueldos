@@ -128,7 +128,7 @@ export const AnalysisResult: React.FC<Props> = ({ result }) => {
         <Row label="Cód. 0302 - Ley 19032 (3% rem)" v={result.ley19032} />
         <Row label={obraSocialLabel} v={result.obraSocial} />
         {result.tieneOsecac && <Row label={osNoRemLabel} v={result.aporteOsNoRem} />}
-        <Row label="Cód. 0322 - Aporte Sindical (2% rem+no rem)" v={result.aportesSindical} />
+        <Row label={`Cód. 0322 - Aporte Sindical (${result.convenio === 'vigilancia' ? '3%' : '2%'} rem${result.convenio === 'comercio' ? '+no rem' : ''})`} v={result.aportesSindical} />
         <Row label="Cód. 0332 - FAECYS (0.5% rem+no rem)" v={result.faecys} />
         <Row label="Cód. 0345 - Cuota de Solidaridad (1% rem)" v={result.cuotaSolidaridad} />
       </div>
