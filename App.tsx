@@ -35,37 +35,26 @@ const App: React.FC = () => {
       setProcessingState({ status: 'processing', progress: 20, currentStep: 'Analizando recibos...' });
 
       const totalImages = images.length;
-      let completedCount = 0;
-      const concurrencyLimit = 2;
-      const resultPromises: Promise<AuditResult>[] = [];
-      const executing: Promise<void>[] = [];
+      const effectiveTotal = Math.ceil(totalImages / 2);
+      const validResults: AuditResult[] = [];
 
       for (let i = 0; i < totalImages; i += 2) {
-        const p = analyzeReceiptImage(images[i], i + 1, convenio).then((result) => {
-          completedCount++;
-          const effectiveTotal = Math.ceil(totalImages / 2);
-          const progress = 20 + Math.floor((completedCount / effectiveTotal) * 80);
-          setProcessingState(prev => ({
-            ...prev,
-            status: 'processing',
-            progress: Math.min(progress, 100),
-            currentStep: `Analizando recibo ${completedCount} de ${effectiveTotal}...`,
-          }));
-          return result;
+        const idx = Math.floor(i / 2) + 1;
+        setProcessingState({
+          status: 'processing',
+          progress: 20 + Math.floor((idx - 1) / effectiveTotal * 80),
+          currentStep: `Analizando recibo ${idx} de ${effectiveTotal}...`,
         });
 
-        resultPromises.push(p);
-        const e: Promise<void> = p.then(() => { executing.splice(executing.indexOf(e), 1); });
-        executing.push(e);
+        const result = await analyzeReceiptImage(images[i], i + 1, convenio);
+        if (!result.skipped) validResults.push(result);
 
-        if (executing.length >= concurrencyLimit) {
-          await Promise.race(executing);
-          await new Promise(resolve => setTimeout(resolve, 1500));
+        // Pausa de 4s entre recibos para no superar el límite de 15 req/min de Gemini
+        if (i + 2 < totalImages) {
+          await new Promise(resolve => setTimeout(resolve, 4000));
         }
       }
 
-      const allResults = await Promise.all(resultPromises);
-      const validResults = allResults.filter(r => !r.skipped);
       setResults(validResults);
       setProcessingState({ status: 'completed', progress: 100 });
 
