@@ -1,15 +1,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 
-const getApiKey = () => {
-  // En Vite, las variables de entorno se exponen con el prefijo VITE_
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_KEY) {
-    return (import.meta as any).env.VITE_API_KEY;
+const getApiKey = (): string => {
+  const key = import.meta.env.VITE_API_KEY;
+  if (!key) {
+    throw new Error('API Key no configurada. Definí VITE_API_KEY en las variables de entorno de Vercel.');
   }
-  if (typeof process !== 'undefined' && process.env?.API_KEY) {
-    return process.env.API_KEY;
-  }
-  throw new Error('API Key no configurada. Definí VITE_API_KEY en las variables de entorno.');
+  return key;
 };
 
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
