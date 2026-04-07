@@ -60,7 +60,7 @@ const App: React.FC = () => {
 
         if (executing.length >= concurrencyLimit) {
           await Promise.race(executing);
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
 

@@ -35,6 +35,7 @@ export interface AuditResult {
   status: 'success' | 'error' | 'skipped';
   skipped?: boolean;
   ignoreReason?: string;
+  errorMessage?: string;
 }
 
 export interface ProcessingState {

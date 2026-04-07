@@ -13,15 +13,26 @@ const MODEL_NAME = 'gemini-2.5-flash';
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const generateWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0], maxRetries = 5) => {
+const generateWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0], maxRetries = 6) => {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await ai.models.generateContent(params);
     } catch (error: any) {
-      const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('rate');
-      if (isRateLimit && attempt < maxRetries - 1) {
-        const waitMs = Math.pow(2, attempt) * 2000;
-        console.warn(`Rate limit en intento ${attempt + 1}, reintentando en ${waitMs / 1000}s...`);
+      const msg = error?.message || error?.toString() || '';
+      const isRetryable =
+        error?.status === 429 ||
+        error?.status === 503 ||
+        error?.status === 500 ||
+        msg.includes('429') ||
+        msg.includes('503') ||
+        msg.includes('quota') ||
+        msg.includes('rate') ||
+        msg.includes('overloaded') ||
+        msg.includes('timeout') ||
+        msg.includes('network');
+      if (isRetryable && attempt < maxRetries - 1) {
+        const waitMs = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s, 24s, 48s
+        console.warn(`Error en intento ${attempt + 1} (${msg.slice(0, 80)}), reintentando en ${waitMs / 1000}s...`);
         await sleep(waitMs);
         continue;
       }
@@ -252,8 +263,9 @@ export const analyzeReceiptImage = async (
 
     return buildComercioResult(data, pageNumber);
 
-  } catch (error) {
-    console.error('Gemini analysis failed', error);
+  } catch (error: any) {
+    const errorMsg = error?.message || error?.toString() || 'Error desconocido';
+    console.error('Gemini analysis failed', errorMsg);
     return {
       pageNumber,
       employeeName: 'Error al analizar',
@@ -271,6 +283,7 @@ export const analyzeReceiptImage = async (
       isCorrect: false,
       status: 'error',
       skipped: false,
+      errorMessage: errorMsg,
     };
   }
 };

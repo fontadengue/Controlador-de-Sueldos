@@ -81,8 +81,21 @@ export const AnalysisResult: React.FC<Props> = ({ result }) => {
         </div>
       </div>
 
+      {/* API error message */}
+      {result.errorMessage && (
+        <div className="mb-4 p-4 bg-red-100 rounded-xl border border-red-300">
+          <div className="flex items-start gap-2 text-red-800">
+            <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm">Error de API al procesar este recibo</p>
+              <p className="text-xs mt-1 font-mono break-all">{result.errorMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Zero salary warning */}
-      {isZeroSalary && (
+      {isZeroSalary && !result.errorMessage && (
         <div className="mb-6 p-6 bg-red-600 rounded-xl shadow-lg border-4 border-red-800 animate-pulse">
           <div className="flex flex-col items-center text-center text-white">
             <AlertTriangle size={48} className="mb-2" />
