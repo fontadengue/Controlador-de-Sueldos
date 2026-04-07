@@ -1,47 +1,38 @@
 
+export type ConvenioType = 'comercio';
+
+export interface DeductionValidation {
+  present: boolean;
+  actual?: number;
+  expected?: number;
+  difference?: number;
+  isCorrect?: boolean;
+}
+
 export interface AuditResult {
   pageNumber: number;
   employeeName: string;
+  convenio: ConvenioType;
+
+  // Haberes
   totalHaberes: number;
   totalNonRemunerative: number;
-  
-  // Jubilacion (11%)
-  jubilacionDeduction: number;
-  expectedJubilacion: number;
-  jubilacionDifference: number;
-  isJubilacionCorrect: boolean;
 
-  // Code 0302 (3%)
-  hasCode0302: boolean;
-  code0302Deduction?: number;
-  expectedCode0302?: number;
-  code0302Difference?: number;
-  isCode0302Correct?: boolean;
+  // Validaciones individuales
+  jubilacion: DeductionValidation;      // 0300 - 11% rem
+  ley19032: DeductionValidation;        // 0302 - 3% rem
+  obraSocial: DeductionValidation;      // 0310 o 0307 - 3% rem (0307 proporciona a jornada completa)
+  aporteOsNoRem: DeductionValidation;   // 0313 o 0317 - 3% no rem (solo OSECAC)
+  aportesSindical: DeductionValidation; // 0322 - 2% rem+noRem
+  faecys: DeductionValidation;          // 0332 - 0.5% rem+noRem
 
-  // Code 0307 (3% of Total Haberes)
-  hasCode0307: boolean;
-  code0307Deduction?: number;
-  expectedCode0307?: number;
-  code0307Difference?: number;
-  isCode0307Correct?: boolean;
+  // Metadata
+  tieneOsecac: boolean;
+  esJornadaReducida: boolean;
+  jornadaHoras?: number; // horas reales si jornada reducida
 
-  // Code 0322 (2% of Total Haberes + NonRemunerative)
-  hasCode0322: boolean;
-  code0322Deduction?: number;
-  expectedCode0322?: number;
-  code0322Difference?: number;
-  isCode0322Correct?: boolean;
-
-  // Code 0332 (0.5% of Total Haberes + NonRemunerative)
-  hasCode0332: boolean;
-  code0332Deduction?: number;
-  expectedCode0332?: number;
-  code0332Difference?: number;
-  isCode0332Correct?: boolean;
-
-  isCorrect: boolean; // Overall status
-  status: 'success' | 'warning' | 'error' | 'skipped';
-  rawResponse?: string;
+  isCorrect: boolean;
+  status: 'success' | 'error' | 'skipped';
   skipped?: boolean;
   ignoreReason?: string;
 }
@@ -49,12 +40,6 @@ export interface AuditResult {
 export interface ProcessingState {
   status: 'idle' | 'processing' | 'completed' | 'error';
   currentStep?: string;
-  progress: number; // 0 to 100
+  progress: number;
   error?: string;
-}
-
-export enum ValidationStatus {
-  CORRECT = 'CORRECT',
-  INCORRECT = 'INCORRECT',
-  UNCERTAIN = 'UNCERTAIN'
 }

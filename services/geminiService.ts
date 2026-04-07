@@ -1,24 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { AuditResult } from "../types";
+import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 
-// Safe API Key access for browser environment
-// Uses the provided key as fallback to work autonomously on Vercel
 const getApiKey = () => {
-  // Check if process.env exists (Node/Build env)
   if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
     return process.env.API_KEY;
   }
-  // Fallback to the provided key for autonomous operation
   return 'AIzaSyCHwXcjz96BN-UkLY9-7pzH5wY-xSQISkA';
 };
 
-// Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
-
-// Switched to gemini-2.5-flash for faster and more reliable document OCR
 const MODEL_NAME = 'gemini-2.5-flash';
 
-// Retry with exponential backoff to handle rate limit errors (429)
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const generateWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0], maxRetries = 5) => {
@@ -28,7 +20,7 @@ const generateWithRetry = async (params: Parameters<typeof ai.models.generateCon
     } catch (error: any) {
       const isRateLimit = error?.status === 429 || error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('rate');
       if (isRateLimit && attempt < maxRetries - 1) {
-        const waitMs = Math.pow(2, attempt) * 2000; // 2s, 4s, 8s, 16s, 32s
+        const waitMs = Math.pow(2, attempt) * 2000;
         console.warn(`Rate limit en intento ${attempt + 1}, reintentando en ${waitMs / 1000}s...`);
         await sleep(waitMs);
         continue;
@@ -39,233 +31,246 @@ const generateWithRetry = async (params: Parameters<typeof ai.models.generateCon
   throw new Error('Max retries reached');
 };
 
-export const analyzeReceiptImage = async (base64Image: string, pageNumber: number): Promise<AuditResult> => {
+// Tolerance for floating point comparison
+const TOLERANCE = 10.0;
+
+const validate = (present: boolean, actual: number, expected: number): DeductionValidation => {
+  if (!present) return { present: false };
+  const difference = Number(Math.abs(expected - actual).toFixed(2));
+  return {
+    present: true,
+    actual,
+    expected,
+    difference,
+    isCorrect: difference < TOLERANCE,
+  };
+};
+
+// ─── COMERCIO CCT 130/75 ────────────────────────────────────────────────────
+
+const COMERCIO_PROMPT = `Analizá este recibo de sueldo del CCT 130/75 (Empleados de Comercio). Es una imagen de alta resolución.
+
+PASO 1: VERIFICAR JUBILACIÓN
+Buscá el código 0300 (JUBILACION). Si no existe, marcá hasJubilacion=false y no sigas.
+
+PASO 2: DATOS GENERALES
+- employeeName: nombre completo del empleado
+- totalHaberes: valor de "Total Haberes" (columna remunerativa)
+- totalNonRemunerative: valor de "Tot. Hab.s/Desc." o "Total No Remunerativo"
+
+PASO 3: DETECTAR TIPO DE JORNADA Y OBRA SOCIAL
+- tieneOsecac: true si la obra social es OSECAC (código 126205). false si es otra OS.
+- esJornadaReducida: true si aparece código 0307 o 0317. false si aparece 0310 o 0313.
+- jornadaHorasDiarias: horas de jornada diaria si aparece en el recibo (null si no figura)
+
+PASO 4: EXTRAER DEDUCCIONES (todos los que estén presentes, null si no aparecen)
+- cod0300_jubilacion: importe del código 0300
+- cod0302_ley19032: importe del código 0302
+- cod0310_obraSocial: importe del código 0310 (jornada completa, sin OSECAC o con OSECAC)
+- cod0307_obraSocialJornRed: importe del código 0307 (jornada reducida)
+- cod0313_osAcuerdoColec: importe del código 0313 (OS sobre no rem, con OSECAC, jornada completa)
+- cod0317_osAcuerdoColecJRed: importe del código 0317 (OS sobre no rem, con OSECAC, jornada reducida)
+- cod0322_aportesSindical: importe del código 0322
+- cod0332_faecys: importe del código 0332
+
+FORMATO NUMÉRICO ARGENTINO:
+- El punto (.) separa miles: 1.000 = mil
+- La coma (,) separa decimales: 50,00 = cincuenta
+- Convertí "1.179.320,91" a 1179320.91 en el JSON
+- Si un campo no existe en el recibo, retornarlo como null
+`;
+
+const COMERCIO_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    hasJubilacion: { type: Type.BOOLEAN },
+    employeeName: { type: Type.STRING },
+    totalHaberes: { type: Type.NUMBER },
+    totalNonRemunerative: { type: Type.NUMBER },
+    tieneOsecac: { type: Type.BOOLEAN },
+    esJornadaReducida: { type: Type.BOOLEAN },
+    jornadaHorasDiarias: { type: Type.NUMBER },
+    cod0300_jubilacion: { type: Type.NUMBER },
+    cod0302_ley19032: { type: Type.NUMBER },
+    cod0310_obraSocial: { type: Type.NUMBER },
+    cod0307_obraSocialJornRed: { type: Type.NUMBER },
+    cod0313_osAcuerdoColec: { type: Type.NUMBER },
+    cod0317_osAcuerdoColecJRed: { type: Type.NUMBER },
+    cod0322_aportesSindical: { type: Type.NUMBER },
+    cod0332_faecys: { type: Type.NUMBER },
+  },
+  required: ['hasJubilacion'],
+};
+
+const buildComercioResult = (data: any, pageNumber: number): AuditResult => {
+  const totalHaberes = data.totalHaberes || 0;
+  const totalNoRem = data.totalNonRemunerative || 0;
+  const totalBase = totalHaberes + totalNoRem;
+  const tieneOsecac: boolean = !!data.tieneOsecac;
+  const esJornadaReducida: boolean = !!data.esJornadaReducida;
+
+  // 0300 - Jubilación: 11% rem
+  const jubilacion = validate(
+    data.cod0300_jubilacion != null,
+    data.cod0300_jubilacion || 0,
+    Number((totalHaberes * 0.11).toFixed(2))
+  );
+
+  // 0302 - Ley 19032: 3% rem
+  const ley19032 = validate(
+    data.cod0302_ley19032 != null,
+    data.cod0302_ley19032 || 0,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  // 0310 / 0307 - Obra Social: 3% rem
+  // Para jornada reducida (0307), el aporte siempre es sobre jornada completa,
+  // pero como el sistema recibe el totalHaberes real del recibo (ya proporcional),
+  // la base de cálculo para validar es el totalHaberes tal como figura en el recibo.
+  // El sistema liquida internamente la proporción; nosotros solo verificamos que
+  // lo descontado sea 3% de lo que figura como Total Haberes.
+  const obraSocialActual = esJornadaReducida
+    ? (data.cod0307_obraSocialJornRed || 0)
+    : (data.cod0310_obraSocial || 0);
+  const obraSocialPresente = esJornadaReducida
+    ? data.cod0307_obraSocialJornRed != null
+    : data.cod0310_obraSocial != null;
+  const obraSocial = validate(
+    obraSocialPresente,
+    obraSocialActual,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  // 0313 / 0317 - OS Acuerdo Colectivo sobre No Rem: 3% noRem (solo OSECAC)
+  const osNoRemActual = esJornadaReducida
+    ? (data.cod0317_osAcuerdoColecJRed || 0)
+    : (data.cod0313_osAcuerdoColec || 0);
+  const osNoRemPresente = tieneOsecac && (esJornadaReducida
+    ? data.cod0317_osAcuerdoColecJRed != null
+    : data.cod0313_osAcuerdoColec != null);
+  const aporteOsNoRem = validate(
+    osNoRemPresente,
+    osNoRemActual,
+    Number((totalNoRem * 0.03).toFixed(2))
+  );
+
+  // 0322 - Aporte Sindical: 2% rem+noRem
+  const aportesSindical = validate(
+    data.cod0322_aportesSindical != null,
+    data.cod0322_aportesSindical || 0,
+    Number((totalBase * 0.02).toFixed(2))
+  );
+
+  // 0332 - FAECYS: 0.5% rem+noRem
+  const faecys = validate(
+    data.cod0332_faecys != null,
+    data.cod0332_faecys || 0,
+    Number((totalBase * 0.005).toFixed(2))
+  );
+
+  const isZeroSalary = totalHaberes === 0;
+  const isCorrect =
+    !isZeroSalary &&
+    (jubilacion.isCorrect ?? true) &&
+    (ley19032.isCorrect ?? true) &&
+    (obraSocial.isCorrect ?? true) &&
+    (aporteOsNoRem.isCorrect ?? true) &&
+    (aportesSindical.isCorrect ?? true) &&
+    (faecys.isCorrect ?? true);
+
+  return {
+    pageNumber,
+    employeeName: data.employeeName || 'Nombre no identificado',
+    convenio: 'comercio',
+    totalHaberes,
+    totalNonRemunerative: totalNoRem,
+    jubilacion,
+    ley19032,
+    obraSocial,
+    aporteOsNoRem,
+    aportesSindical,
+    faecys,
+    tieneOsecac,
+    esJornadaReducida,
+    jornadaHoras: data.jornadaHorasDiarias ?? undefined,
+    isCorrect,
+    status: isCorrect ? 'success' : 'error',
+    skipped: false,
+  };
+};
+
+// ─── ENTRY POINT ─────────────────────────────────────────────────────────────
+
+export const analyzeReceiptImage = async (
+  base64Image: string,
+  pageNumber: number,
+  convenio: ConvenioType = 'comercio'
+): Promise<AuditResult> => {
+  const prompt = COMERCIO_PROMPT;
+  const schema = COMERCIO_SCHEMA;
+
   try {
     const response = await generateWithRetry({
       model: MODEL_NAME,
       contents: {
         parts: [
-          {
-            inlineData: {
-              mimeType: 'image/png', // Changed to PNG to match utils
-              data: base64Image
-            }
-          },
-          {
-            text: `Analiza este recibo de sueldo. Es una imagen de alta resolución.
-            
-            PASO 1: VERIFICACIÓN DE JUBILACIÓN
-            Busca en la columna de CONCEPTOS o DETALLE si existe algún item relacionado con "Jubilación" (ej: "JUBILACION", "JUBIL.", cód 11, etc).
-            - Si NO encuentras absolutamente nada relacionado con jubilación, marca "hasJubilacion" como false.
-            - Si encuentras el concepto, marca "hasJubilacion" como true.
-            
-            PASO 2: EXTRACCIÓN DE DATOS (Si hasJubilacion es true)
-            Extrae con precisión:
-            1. "employeeName": Nombre completo del empleado (generalmente arriba).
-            2. "totalHaberes": La suma total de los haberes REMUNERATIVOS (sujeto a descuentos). Busca la columna "Haberes" o el total abajo "Total Haberes".
-            3. "totalNonRemunerative": La suma de los haberes NO REMUNERATIVOS. Busca columna "Haberes S/Desc", "No Remun", o "Tot. Hab.s/Desc.". Si la columna está vacía o es 0.00, retorna 0.
-            4. "jubilacionDeduction": El importe exacto descontado por el concepto de Jubilación.
-            
-            PASO 3: CÓDIGOS ESPECÍFICOS
-            Busca en la columna "Código" (generalmente la primera columna a la izquierda) los siguientes números exactos. Si los encuentras, extrae el importe de la columna "Deducciones":
-               - Código "0302" -> extraer "code0302Deduction"
-               - Código "0307" -> extraer "code0307Deduction"
-               - Código "0322" -> extraer "code0322Deduction"
-               - Código "0332" -> extraer "code0332Deduction"
-            
-            IMPORTANTE - FORMATO DE NÚMEROS (ARGENTINA):
-            - El punto (.) separa miles (ej: 1.000 es mil).
-            - La coma (,) separa decimales (ej: 50,00 es cincuenta).
-            - Debes convertir "1.800.000,00" a 1800000.00 para el JSON.
-            - Si un campo no existe o está vacío, devuélvelo como null o 0, no inventes números.
-            `
-          }
-        ]
+          { inlineData: { mimeType: 'image/png', data: base64Image } },
+          { text: prompt },
+        ],
       },
       config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            hasJubilacion: { type: Type.BOOLEAN, description: "True si se encontró el concepto Jubilación" },
-            employeeName: { type: Type.STRING },
-            totalHaberes: { type: Type.NUMBER, description: "Total Haberes (Remunerativo)" },
-            totalNonRemunerative: { type: Type.NUMBER, description: "Total Haberes S/Desc (No Remunerativo)" },
-            jubilacionDeduction: { type: Type.NUMBER },
-            
-            hasCode0302: { type: Type.BOOLEAN },
-            code0302Deduction: { type: Type.NUMBER },
-            
-            hasCode0307: { type: Type.BOOLEAN },
-            code0307Deduction: { type: Type.NUMBER },
-
-            hasCode0322: { type: Type.BOOLEAN },
-            code0322Deduction: { type: Type.NUMBER },
-
-            hasCode0332: { type: Type.BOOLEAN },
-            code0332Deduction: { type: Type.NUMBER },
-          },
-          required: ["hasJubilacion"]
-        }
-      }
+        responseMimeType: 'application/json',
+        responseSchema: schema,
+      },
     });
 
     const jsonText = response.text;
-    if (!jsonText) throw new Error("No data returned from AI");
-
+    if (!jsonText) throw new Error('No data returned from AI');
     const data = JSON.parse(jsonText);
 
-    // If Jubilacion is not present, skip this receipt
     if (data.hasJubilacion === false) {
       return {
         pageNumber,
-        employeeName: data.employeeName || "Desconocido",
+        employeeName: data.employeeName || 'Desconocido',
+        convenio,
         totalHaberes: 0,
         totalNonRemunerative: 0,
-        jubilacionDeduction: 0,
-        expectedJubilacion: 0,
-        jubilacionDifference: 0,
-        isJubilacionCorrect: true,
-        hasCode0302: false,
-        hasCode0307: false,
-        hasCode0322: false,
-        hasCode0332: false,
-        isCorrect: true, 
+        jubilacion: { present: false },
+        ley19032: { present: false },
+        obraSocial: { present: false },
+        aporteOsNoRem: { present: false },
+        aportesSindical: { present: false },
+        faecys: { present: false },
+        tieneOsecac: false,
+        esJornadaReducida: false,
+        isCorrect: true,
         status: 'skipped',
         skipped: true,
-        ignoreReason: 'No se encontró concepto de Jubilación'
+        ignoreReason: 'No se encontró concepto de Jubilación',
       };
     }
-    
-    // Base Values
-    const totalHaberes = data.totalHaberes || 0;
-    const totalNonRemunerative = data.totalNonRemunerative || 0;
-    const totalBaseWithNonRem = totalHaberes + totalNonRemunerative;
-    
-    // Critical check: Zero salary
-    const isZeroSalary = totalHaberes === 0;
 
-    // --- 1. Validate Jubilacion (11% of Total Haberes) ---
-    const actualJubilacion = data.jubilacionDeduction || 0;
-    const expectedJubilacion = Number((totalHaberes * 0.11).toFixed(2));
-    const jubDifference = Math.abs(expectedJubilacion - actualJubilacion);
-    const isJubilacionCorrect = jubDifference < 10.0; // Tolerance
-
-    // Helper for optional codes
-    const validateCode = (hasCode: boolean, actual: number, expected: number) => {
-        if (!hasCode) return { isCorrect: true, diff: 0, exp: 0, val: 0 };
-        const diff = Math.abs(expected - actual);
-        return {
-            isCorrect: diff < 10.0, // Tolerance
-            diff: Number(diff.toFixed(2)),
-            exp: expected,
-            val: actual
-        };
-    };
-
-    // --- 2. Validate Code 0302 (3% of Total Haberes) ---
-    const res0302 = validateCode(
-        !!data.hasCode0302, 
-        data.code0302Deduction || 0, 
-        Number((totalHaberes * 0.03).toFixed(2))
-    );
-
-    // --- 3. Validate Code 0307 ((3% of Total Haberes) * 2) ---
-    const res0307 = validateCode(
-        !!data.hasCode0307,
-        data.code0307Deduction || 0,
-        Number(((totalHaberes * 0.03) * 2).toFixed(2))
-    );
-
-    // --- 4. Validate Code 0322 (2% of Total Haberes + NonRemunerative) ---
-    // User requested to remove * 2 multiplier
-    const res0322 = validateCode(
-        !!data.hasCode0322,
-        data.code0322Deduction || 0,
-        Number((totalBaseWithNonRem * 0.02).toFixed(2))
-    );
-
-    // --- 5. Validate Code 0332 (0.5% of Total Haberes + NonRemunerative) ---
-    // User requested 0,05%, assuming 0.5% (FAECYS standard) due to comma usage ambiguity.
-    const res0332 = validateCode(
-        !!data.hasCode0332,
-        data.code0332Deduction || 0,
-        Number((totalBaseWithNonRem * 0.005).toFixed(2))
-    );
-
-    // Overall Status
-    const isOverallCorrect = 
-        !isZeroSalary && // Fail if salary is 0
-        isJubilacionCorrect && 
-        res0302.isCorrect && 
-        res0307.isCorrect && 
-        res0322.isCorrect && 
-        res0332.isCorrect;
-
-    return {
-      pageNumber,
-      employeeName: data.employeeName || "Nombre no identificado",
-      totalHaberes: totalHaberes,
-      totalNonRemunerative: totalNonRemunerative,
-      
-      // Jubilacion Data
-      jubilacionDeduction: actualJubilacion,
-      expectedJubilacion,
-      jubilacionDifference: Number(jubDifference.toFixed(2)),
-      isJubilacionCorrect,
-
-      // Code 0302 Data
-      hasCode0302: !!data.hasCode0302,
-      code0302Deduction: data.hasCode0302 ? res0302.val : undefined,
-      expectedCode0302: data.hasCode0302 ? res0302.exp : undefined,
-      code0302Difference: data.hasCode0302 ? res0302.diff : undefined,
-      isCode0302Correct: data.hasCode0302 ? res0302.isCorrect : undefined,
-
-      // Code 0307 Data
-      hasCode0307: !!data.hasCode0307,
-      code0307Deduction: data.hasCode0307 ? res0307.val : undefined,
-      expectedCode0307: data.hasCode0307 ? res0307.exp : undefined,
-      code0307Difference: data.hasCode0307 ? res0307.diff : undefined,
-      isCode0307Correct: data.hasCode0307 ? res0307.isCorrect : undefined,
-
-      // Code 0322 Data
-      hasCode0322: !!data.hasCode0322,
-      code0322Deduction: data.hasCode0322 ? res0322.val : undefined,
-      expectedCode0322: data.hasCode0322 ? res0322.exp : undefined,
-      code0322Difference: data.hasCode0322 ? res0322.diff : undefined,
-      isCode0322Correct: data.hasCode0322 ? res0322.isCorrect : undefined,
-
-      // Code 0332 Data
-      hasCode0332: !!data.hasCode0332,
-      code0332Deduction: data.hasCode0332 ? res0332.val : undefined,
-      expectedCode0332: data.hasCode0332 ? res0332.exp : undefined,
-      code0332Difference: data.hasCode0332 ? res0332.diff : undefined,
-      isCode0332Correct: data.hasCode0332 ? res0332.isCorrect : undefined,
-
-      isCorrect: isOverallCorrect,
-      status: isOverallCorrect ? 'success' : 'error',
-      skipped: false
-    };
+    return buildComercioResult(data, pageNumber);
 
   } catch (error) {
-    console.error("Gemini analysis failed", error);
+    console.error('Gemini analysis failed', error);
     return {
       pageNumber,
-      employeeName: "Error al analizar",
+      employeeName: 'Error al analizar',
+      convenio,
       totalHaberes: 0,
       totalNonRemunerative: 0,
-      jubilacionDeduction: 0,
-      expectedJubilacion: 0,
-      jubilacionDifference: 0,
-      isJubilacionCorrect: false,
-      hasCode0302: false,
-      hasCode0307: false,
-      hasCode0322: false,
-      hasCode0332: false,
+      jubilacion: { present: false },
+      ley19032: { present: false },
+      obraSocial: { present: false },
+      aporteOsNoRem: { present: false },
+      aportesSindical: { present: false },
+      faecys: { present: false },
+      tieneOsecac: false,
+      esJornadaReducida: false,
       isCorrect: false,
       status: 'error',
-      rawResponse: "Error processing this page.",
-      skipped: false
+      skipped: false,
     };
   }
 };
