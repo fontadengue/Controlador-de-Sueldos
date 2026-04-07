@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UploadCloud, RefreshCw, CheckCircle, AlertTriangle, Zap, BarChart3, ChevronRight, Briefcase } from 'lucide-react';
+import { UploadCloud, RefreshCw, CheckCircle, AlertTriangle, Zap, BarChart3, ChevronRight, Briefcase, Printer } from 'lucide-react';
 import { convertPdfToImages } from './utils/pdfUtils';
 import { analyzeReceiptImage } from './services/geminiService';
 import { AuditResult, ProcessingState, ConvenioType } from './types';
@@ -208,6 +208,12 @@ const App: React.FC = () => {
         {/* STEP 3: Results */}
         {results.length > 0 && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Título visible solo al imprimir */}
+            <div className="print-title mb-4">
+              <h1 style={{fontSize:'20px', fontWeight:'bold', marginBottom:'4px'}}>Auditoría de Haberes — {CONVENIOS.find(c => c.id === convenio)?.label}</h1>
+              <p style={{fontSize:'13px', color:'#555'}}>Fecha: {new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric' })}</p>
+              <hr style={{marginTop:'8px'}}/>
+            </div>
             <div className="flex items-center justify-between border-b border-gray-200 pb-4">
               <h3 className="text-xl font-bold text-gray-900">Resultados del Análisis</h3>
               <div className="flex gap-4 text-sm font-medium">
@@ -233,7 +239,14 @@ const App: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex justify-center pt-8">
+            <div className="flex justify-center gap-4 pt-8">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 px-4 py-2 text-white bg-gray-800 hover:bg-gray-900 rounded-lg transition-colors"
+              >
+                <Printer size={18} />
+                Imprimir reporte
+              </button>
               <button onClick={reset} className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 <RefreshCw size={18} />
                 Analizar otro archivo

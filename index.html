@@ -22,6 +22,38 @@
         }
       }
     </script>
+    <style>
+      @media print {
+        /* Ocultar header sticky, botones y secciones de upload */
+        header,
+        .no-print,
+        button {
+          display: none !important;
+        }
+        /* Quitar sticky del header para que no tape nada */
+        body {
+          background: white !important;
+        }
+        /* Evitar cortes de página dentro de cada tarjeta de resultado */
+        .rounded-xl {
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        /* Resetear padding/margin para aprovechar el papel */
+        main {
+          padding: 0 !important;
+          margin: 0 !important;
+          max-width: 100% !important;
+        }
+        /* Mostrar título del reporte al imprimir */
+        .print-title {
+          display: block !important;
+        }
+      }
+      .print-title {
+        display: none;
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {
