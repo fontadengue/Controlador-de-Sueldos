@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 
-const MODEL_NAME = 'gemini-2.0-flash';
+const MODEL_NAME = 'gemini-2.5-flash';
 
 const ai = new GoogleGenAI({ apiKey: 'AIzaSyBKSrNzKBeBfQyKUWlySNp507kxVeFpjRk' });
 
