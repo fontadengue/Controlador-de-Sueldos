@@ -3,31 +3,41 @@ import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 
 const MODEL_NAME = 'gemini-2.5-flash';
 
-const ai = new GoogleGenAI({ apiKey: 'AIzaSyBKSrNzKBeBfQyKUWlySNp507kxVeFpjRk' });
+const AI_KEYS = [
+  'AIzaSyBKSrNzKBeBfQyKUWlySNp507kxVeFpjRk',
+  'AIzaSyCis7WqDy70YmsaKBwGD4eeq41G5g26Q20',
+];
+
+let currentKeyIndex = 0;
+
+const getAi = () => new GoogleGenAI({ apiKey: AI_KEYS[currentKeyIndex] });
+
+const rotateKey = () => {
+  currentKeyIndex = (currentKeyIndex + 1) % AI_KEYS.length;
+  console.log(`Rotando a key ${currentKeyIndex + 1} de ${AI_KEYS.length}`);
+};
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const generateWithRetry = async (params: Parameters<typeof ai.models.generateContent>[0], maxRetries = 6) => {
+const generateWithRetry = async (params: Parameters<ReturnType<typeof getAi>['models']['generateContent']>[0], maxRetries = 6) => {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await ai.models.generateContent(params);
+      return await getAi().models.generateContent(params);
     } catch (error: any) {
       const msg = error?.message || error?.toString() || '';
-      const isRetryable =
-        error?.status === 429 ||
-        error?.status === 503 ||
-        error?.status === 500 ||
-        msg.includes('429') ||
-        msg.includes('503') ||
-        msg.includes('quota') ||
-        msg.includes('rate') ||
-        msg.includes('overloaded') ||
-        msg.includes('timeout') ||
-        msg.includes('network');
+      const isQuota = error?.status === 429 || msg.includes('429') || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+      const isRetryable = isQuota || error?.status === 503 || error?.status === 500 || msg.includes('timeout') || msg.includes('network');
       if (isRetryable && attempt < maxRetries - 1) {
-        const waitMs = Math.pow(2, attempt) * 3000; // 3s, 6s, 12s, 24s, 48s
-        console.warn(`Error en intento ${attempt + 1} (${msg.slice(0, 80)}), reintentando en ${waitMs / 1000}s...`);
-        await sleep(waitMs);
+        if (isQuota) {
+          // Rotar a la siguiente key antes de reintentar
+          rotateKey();
+          console.warn(`Quota agotada, rotando key. Reintento ${attempt + 1}...`);
+          await sleep(2000);
+        } else {
+          const waitMs = Math.pow(2, attempt) * 3000;
+          console.warn(`Error en intento ${attempt + 1} (${msg.slice(0, 80)}), reintentando en ${waitMs / 1000}s...`);
+          await sleep(waitMs);
+        }
         continue;
       }
       throw error;
