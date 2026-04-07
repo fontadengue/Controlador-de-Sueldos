@@ -11,6 +11,11 @@ const CONVENIOS: { id: ConvenioType; label: string; description: string }[] = [
     label: 'Empleados de Comercio',
     description: 'CCT 130/75 — Jubilación, OS, Sindical, FAECYS',
   },
+  {
+    id: 'sanidad',
+    label: 'Empleados de Sanidad',
+    description: 'CCT 180/75 — Jubilación, OS, Cuota de Solidaridad',
+  },
 ];
 
 const App: React.FC = () => {

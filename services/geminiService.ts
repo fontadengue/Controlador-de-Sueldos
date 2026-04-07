@@ -195,6 +195,7 @@ const buildComercioResult = (data: any, pageNumber: number): AuditResult => {
     aporteOsNoRem,
     aportesSindical,
     faecys,
+    cuotaSolidaridad: { present: false },
     tieneOsecac,
     esJornadaReducida,
     jornadaHoras: data.jornadaHorasDiarias ?? undefined,
@@ -211,8 +212,8 @@ export const analyzeReceiptImage = async (
   pageNumber: number,
   convenio: ConvenioType = 'comercio'
 ): Promise<AuditResult> => {
-  const prompt = COMERCIO_PROMPT;
-  const schema = COMERCIO_SCHEMA;
+  const prompt = convenio === 'sanidad' ? SANIDAD_PROMPT : COMERCIO_PROMPT;
+  const schema = convenio === 'sanidad' ? SANIDAD_SCHEMA : COMERCIO_SCHEMA;
 
   try {
     const response = await generateWithRetry({
@@ -246,6 +247,7 @@ export const analyzeReceiptImage = async (
         aporteOsNoRem: { present: false },
         aportesSindical: { present: false },
         faecys: { present: false },
+        cuotaSolidaridad: { present: false },
         tieneOsecac: false,
         esJornadaReducida: false,
         isCorrect: true,
@@ -255,7 +257,9 @@ export const analyzeReceiptImage = async (
       };
     }
 
-    return buildComercioResult(data, pageNumber);
+    return convenio === 'sanidad'
+      ? buildSanidadResult(data, pageNumber)
+      : buildComercioResult(data, pageNumber);
 
   } catch (error: any) {
     const errorMsg = error?.message || error?.toString() || 'Error desconocido';
@@ -272,6 +276,7 @@ export const analyzeReceiptImage = async (
       aporteOsNoRem: { present: false },
       aportesSindical: { present: false },
       faecys: { present: false },
+      cuotaSolidaridad: { present: false },
       tieneOsecac: false,
       esJornadaReducida: false,
       isCorrect: false,
@@ -280,4 +285,118 @@ export const analyzeReceiptImage = async (
       errorMessage: errorMsg,
     };
   }
+};
+
+// ─── SANIDAD CCT 180/75 ──────────────────────────────────────────────────────
+
+const SANIDAD_PROMPT = `Analizá este recibo de sueldo del CCT 180/75 (Empleados de Sanidad). Es una imagen de alta resolución.
+
+PASO 1: VERIFICAR JUBILACIÓN
+Buscá el código 0300 (JUBILACION). Si no existe, marcá hasJubilacion=false y no sigas.
+
+PASO 2: DATOS GENERALES
+- employeeName: nombre completo del empleado
+- totalHaberes: valor de "Total Haberes" (columna remunerativa)
+- totalNonRemunerative: valor de "Tot. Hab.s/Desc." o "Total No Remunerativo" (0 si no existe)
+
+PASO 3: TIPO DE JORNADA
+- esJornadaReducida: true si aparece código 0307 o 0004. false si aparece 0310 o 0010.
+
+PASO 4: EXTRAER DEDUCCIONES (null si no aparece en el recibo)
+- cod0300_jubilacion: importe del código 0300
+- cod0302_ley19032: importe del código 0302
+- cod0310_obraSocial: importe del código 0310 (jornada completa)
+- cod0307_obraSocialJornRed: importe del código 0307 (jornada reducida)
+- cod0345_cuotaSolidaridad: importe del código 0345
+
+FORMATO NUMÉRICO ARGENTINO:
+- El punto (.) separa miles: 1.000 = mil
+- La coma (,) separa decimales: 50,00 = cincuenta
+- Convertí "1.179.320,91" a 1179320.91 en el JSON
+- Si un campo no existe retornarlo como null
+`;
+
+const SANIDAD_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    hasJubilacion: { type: Type.BOOLEAN },
+    employeeName: { type: Type.STRING },
+    totalHaberes: { type: Type.NUMBER },
+    totalNonRemunerative: { type: Type.NUMBER },
+    esJornadaReducida: { type: Type.BOOLEAN },
+    cod0300_jubilacion: { type: Type.NUMBER },
+    cod0302_ley19032: { type: Type.NUMBER },
+    cod0310_obraSocial: { type: Type.NUMBER },
+    cod0307_obraSocialJornRed: { type: Type.NUMBER },
+    cod0345_cuotaSolidaridad: { type: Type.NUMBER },
+  },
+  required: ['hasJubilacion'],
+};
+
+const buildSanidadResult = (data: any, pageNumber: number): AuditResult => {
+  const totalHaberes = data.totalHaberes || 0;
+  const totalNoRem = data.totalNonRemunerative || 0;
+  const esJornadaReducida: boolean = !!data.esJornadaReducida;
+
+  // 0300 - Jubilación: 11% rem
+  const jubilacion = validate(
+    data.cod0300_jubilacion != null,
+    data.cod0300_jubilacion || 0,
+    Number((totalHaberes * 0.11).toFixed(2))
+  );
+
+  // 0302 - Ley 19032: 3% rem
+  const ley19032 = validate(
+    data.cod0302_ley19032 != null,
+    data.cod0302_ley19032 || 0,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  // 0310 / 0307 - Obra Social: 3% rem
+  const obraSocialActual = esJornadaReducida
+    ? (data.cod0307_obraSocialJornRed || 0)
+    : (data.cod0310_obraSocial || 0);
+  const obraSocialPresente = esJornadaReducida
+    ? data.cod0307_obraSocialJornRed != null
+    : data.cod0310_obraSocial != null;
+  const obraSocial = validate(
+    obraSocialPresente,
+    obraSocialActual,
+    Number((totalHaberes * 0.03).toFixed(2))
+  );
+
+  // 0345 - Cuota de Solidaridad: 1% rem
+  const cuotaSolidaridad = validate(
+    data.cod0345_cuotaSolidaridad != null,
+    data.cod0345_cuotaSolidaridad || 0,
+    Number((totalHaberes * 0.01).toFixed(2))
+  );
+
+  const isZeroSalary = totalHaberes === 0;
+  const isCorrect =
+    !isZeroSalary &&
+    (jubilacion.isCorrect ?? true) &&
+    (ley19032.isCorrect ?? true) &&
+    (obraSocial.isCorrect ?? true) &&
+    (cuotaSolidaridad.isCorrect ?? true);
+
+  return {
+    pageNumber,
+    employeeName: data.employeeName || 'Nombre no identificado',
+    convenio: 'sanidad',
+    totalHaberes,
+    totalNonRemunerative: totalNoRem,
+    jubilacion,
+    ley19032,
+    obraSocial,
+    aporteOsNoRem: { present: false },
+    aportesSindical: { present: false },
+    faecys: { present: false },
+    cuotaSolidaridad,
+    tieneOsecac: false,
+    esJornadaReducida,
+    isCorrect,
+    status: isCorrect ? 'success' : 'error',
+    skipped: false,
+  };
 };

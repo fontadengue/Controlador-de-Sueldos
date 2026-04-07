@@ -130,6 +130,7 @@ export const AnalysisResult: React.FC<Props> = ({ result }) => {
         {result.tieneOsecac && <Row label={osNoRemLabel} v={result.aporteOsNoRem} />}
         <Row label="Cód. 0322 - Aporte Sindical (2% rem+no rem)" v={result.aportesSindical} />
         <Row label="Cód. 0332 - FAECYS (0.5% rem+no rem)" v={result.faecys} />
+        <Row label="Cód. 0345 - Cuota de Solidaridad (1% rem)" v={result.cuotaSolidaridad} />
       </div>
 
       {isError && !isZeroSalary && (
