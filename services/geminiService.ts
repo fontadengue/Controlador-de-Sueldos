@@ -2,10 +2,14 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 
 const getApiKey = () => {
-  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+  // En Vite, las variables de entorno se exponen con el prefijo VITE_
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_KEY) {
+    return (import.meta as any).env.VITE_API_KEY;
+  }
+  if (typeof process !== 'undefined' && process.env?.API_KEY) {
     return process.env.API_KEY;
   }
-  return 'AIzaSyCHwXcjz96BN-UkLY9-7pzH5wY-xSQISkA';
+  throw new Error('API Key no configurada. Definí VITE_API_KEY en las variables de entorno.');
 };
 
 const ai = new GoogleGenAI({ apiKey: getApiKey() });
