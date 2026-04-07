@@ -1,16 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AuditResult, ConvenioType, DeductionValidation } from "../types";
 
-const getApiKey = (): string => {
-  const key = import.meta.env.VITE_API_KEY;
-  if (!key) {
-    throw new Error('API Key no configurada. Definí VITE_API_KEY en las variables de entorno de Vercel.');
-  }
-  return key;
-};
-
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
 const MODEL_NAME = 'gemini-2.5-flash';
+
+const ai = new GoogleGenAI({ apiKey: 'AIzaSyBKSrNzKBeBfQyKUWlySNp507kxVeFpjRk' });
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
