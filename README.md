@@ -1,20 +1,22 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Controlador de Sueldos
 
-# Run and deploy your AI Studio app
+App para auditar recibos de sueldo en Argentina usando IA (Gemini).
 
-This contains everything you need to run your app locally.
+## Funcionalidades
+- Carga de PDF con múltiples recibos
+- Extracción automática de haberes y deducciones via OCR con IA
+- Validación de:
+  - Jubilación (11% de haberes)
+  - Cód. 0302 - Ley 19032 (3%)
+  - Cód. 0307 (3% de haberes)
+  - Cód. 0322 (2% de haberes + no remunerativos)
+  - Cód. 0332 (0.5% de haberes + no remunerativos)
+- Resultados agrupados por empleado
 
-View your app in AI Studio: https://ai.studio/apps/drive/10tpFWtPdIf-LQP3zT6vrLvso9GF6JXxn
+## Stack
+- React 19 + TypeScript
+- Vite
+- Tailwind CSS
+- PDF.js para conversión de PDF a imágenes
+- Google Gemini 2.5 Flash para OCR y análisis
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
