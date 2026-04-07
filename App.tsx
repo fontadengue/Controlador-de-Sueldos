@@ -6,21 +6,11 @@ import { AuditResult, ProcessingState, ConvenioType } from './types';
 import { AnalysisResult } from './components/AnalysisResult';
 
 const CONVENIOS: { id: ConvenioType; label: string; description: string }[] = [
-  {
-    id: 'comercio',
-    label: 'Empleados de Comercio',
-    description: 'CCT 130/75 — Jubilación, OS, Sindical, FAECYS',
-  },
-  {
-    id: 'sanidad',
-    label: 'Empleados de Sanidad',
-    description: 'CCT 180/75 — Jubilación, OS, Cuota de Solidaridad',
-  },
-  {
-    id: 'vigilancia',
-    label: 'Vigilancia Privada',
-    description: 'CCT 426/05 — Jubilación, OS, Aporte Sindical 3%',
-  },
+  { id: 'comercio',   label: 'Empleados de Comercio',    description: 'CCT 130/75 — Jubilación, OS, Sindical 2%, FAECYS' },
+  { id: 'sanidad',    label: 'Empleados de Sanidad',      description: 'CCT 180/75 — Jubilación, OS, Cuota Solidaridad 1%' },
+  { id: 'vigilancia', label: 'Vigilancia Privada',        description: 'CCT 426/05 — Jubilación, OS, Sindical 3%' },
+  { id: 'faatra',     label: 'Talleres Automotores',      description: 'CCT 27/88 FAATRA-SMATA — Jubilación, OS, Sindical 5%' },
+  { id: 'farmacia',   label: 'Farmacia',                  description: 'CCT 426/05 SF — Jubilación, OS, Sindical 3%, Art.47 10%' },
 ];
 
 const App: React.FC = () => {

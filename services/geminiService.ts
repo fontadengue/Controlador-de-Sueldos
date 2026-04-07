@@ -196,6 +196,8 @@ const buildComercioResult = (data: any, pageNumber: number): AuditResult => {
     aportesSindical,
     faecys,
     cuotaSolidaridad: { present: false },
+    sepelioPresente: false,
+    aporteArt47: { present: false },
     tieneOsecac,
     esJornadaReducida,
     jornadaHoras: data.jornadaHorasDiarias ?? undefined,
@@ -212,8 +214,16 @@ export const analyzeReceiptImage = async (
   pageNumber: number,
   convenio: ConvenioType = 'comercio'
 ): Promise<AuditResult> => {
-  const prompt = convenio === 'sanidad' ? SANIDAD_PROMPT : convenio === 'vigilancia' ? VIGILANCIA_PROMPT : COMERCIO_PROMPT;
-  const schema = convenio === 'sanidad' ? SANIDAD_SCHEMA : convenio === 'vigilancia' ? VIGILANCIA_SCHEMA : COMERCIO_SCHEMA;
+  const prompt = convenio === 'sanidad' ? SANIDAD_PROMPT
+    : convenio === 'vigilancia' ? VIGILANCIA_PROMPT
+    : convenio === 'faatra' ? FAATRA_PROMPT
+    : convenio === 'farmacia' ? FARMACIA_PROMPT
+    : COMERCIO_PROMPT;
+  const schema = convenio === 'sanidad' ? SANIDAD_SCHEMA
+    : convenio === 'vigilancia' ? VIGILANCIA_SCHEMA
+    : convenio === 'faatra' ? FAATRA_SCHEMA
+    : convenio === 'farmacia' ? FARMACIA_SCHEMA
+    : COMERCIO_SCHEMA;
 
   try {
     const response = await generateWithRetry({
@@ -248,6 +258,8 @@ export const analyzeReceiptImage = async (
         aportesSindical: { present: false },
         faecys: { present: false },
         cuotaSolidaridad: { present: false },
+        sepelioPresente: false,
+        aporteArt47: { present: false },
         tieneOsecac: false,
         esJornadaReducida: false,
         isCorrect: true,
@@ -257,10 +269,10 @@ export const analyzeReceiptImage = async (
       };
     }
 
-    return convenio === 'sanidad'
-      ? buildSanidadResult(data, pageNumber)
-      : convenio === 'vigilancia'
-      ? buildVigilanciaResult(data, pageNumber)
+    return convenio === 'sanidad' ? buildSanidadResult(data, pageNumber)
+      : convenio === 'vigilancia' ? buildVigilanciaResult(data, pageNumber)
+      : convenio === 'faatra' ? buildFaatraResult(data, pageNumber)
+      : convenio === 'farmacia' ? buildFarmaciaResult(data, pageNumber)
       : buildComercioResult(data, pageNumber);
 
   } catch (error: any) {
@@ -279,6 +291,8 @@ export const analyzeReceiptImage = async (
       aportesSindical: { present: false },
       faecys: { present: false },
       cuotaSolidaridad: { present: false },
+      sepelioPresente: false,
+      aporteArt47: { present: false },
       tieneOsecac: false,
       esJornadaReducida: false,
       isCorrect: false,
@@ -395,6 +409,8 @@ const buildSanidadResult = (data: any, pageNumber: number): AuditResult => {
     aportesSindical: { present: false },
     faecys: { present: false },
     cuotaSolidaridad,
+    sepelioPresente: false,
+    aporteArt47: { present: false },
     tieneOsecac: false,
     esJornadaReducida,
     isCorrect,
@@ -501,6 +517,177 @@ const buildVigilanciaResult = (data: any, pageNumber: number): AuditResult => {
     aportesSindical,
     faecys: { present: false },
     cuotaSolidaridad: { present: false },
+    sepelioPresente: false,
+    aporteArt47: { present: false },
+    tieneOsecac: false,
+    esJornadaReducida,
+    isCorrect,
+    status: isCorrect ? 'success' : 'error',
+    skipped: false,
+  };
+};
+
+// ─── FAATRA CCT 27/88 ────────────────────────────────────────────────────────
+
+const FAATRA_PROMPT = `Analizá este recibo de sueldo del CCT 27/88 FAATRA-SMATA (Talleres de Reparación Automotores). Es una imagen de alta resolución.
+
+PASO 1: VERIFICAR JUBILACIÓN
+Buscá el código 0300 (JUBILACION). Si no existe, marcá hasJubilacion=false y no sigas.
+
+PASO 2: DATOS GENERALES
+- employeeName: nombre completo del empleado
+- totalHaberes: valor de "Total Haberes" (columna remunerativa)
+- totalNonRemunerative: valor de "Tot. Hab.s/Desc." o "Total No Remunerativo" (0 si no existe)
+
+PASO 3: TIPO DE JORNADA
+- esJornadaReducida: true si aparece código 0004. false si aparece 0010.
+
+PASO 4: EXTRAER DEDUCCIONES (null si no aparece en el recibo)
+- cod0300_jubilacion: importe del código 0300
+- cod0302_ley19032: importe del código 0302
+- cod0310_obraSocial: importe del código 0310
+- cod0322_aportesSindical: importe del código 0322
+- cod0334_sepelio: importe del código 0334 (null si no existe)
+
+FORMATO NUMÉRICO ARGENTINO:
+- El punto (.) separa miles: 1.000 = mil
+- La coma (,) separa decimales: 50,00 = cincuenta
+- Convertí "1.179.320,91" a 1179320.91 en el JSON
+- Si un campo no existe retornarlo como null
+`;
+
+const FAATRA_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    hasJubilacion: { type: Type.BOOLEAN },
+    employeeName: { type: Type.STRING },
+    totalHaberes: { type: Type.NUMBER },
+    totalNonRemunerative: { type: Type.NUMBER },
+    esJornadaReducida: { type: Type.BOOLEAN },
+    cod0300_jubilacion: { type: Type.NUMBER },
+    cod0302_ley19032: { type: Type.NUMBER },
+    cod0310_obraSocial: { type: Type.NUMBER },
+    cod0322_aportesSindical: { type: Type.NUMBER },
+    cod0334_sepelio: { type: Type.NUMBER },
+  },
+  required: ['hasJubilacion'],
+};
+
+const buildFaatraResult = (data: any, pageNumber: number): AuditResult => {
+  const totalHaberes = data.totalHaberes || 0;
+  const totalNoRem = data.totalNonRemunerative || 0;
+  const totalBase = totalHaberes + totalNoRem;
+  const esJornadaReducida: boolean = !!data.esJornadaReducida;
+
+  const jubilacion = validate(data.cod0300_jubilacion != null, data.cod0300_jubilacion || 0, Number((totalHaberes * 0.11).toFixed(2)));
+  const ley19032 = validate(data.cod0302_ley19032 != null, data.cod0302_ley19032 || 0, Number((totalHaberes * 0.03).toFixed(2)));
+  const obraSocial = validate(data.cod0310_obraSocial != null, data.cod0310_obraSocial || 0, Number((totalHaberes * 0.03).toFixed(2)));
+  // 0322 - Aporte Sindical: 5% rem + no rem
+  const aportesSindical = validate(data.cod0322_aportesSindical != null, data.cod0322_aportesSindical || 0, Number((totalBase * 0.05).toFixed(2)));
+
+  const isZeroSalary = totalHaberes === 0;
+  const isCorrect = !isZeroSalary && (jubilacion.isCorrect ?? true) && (ley19032.isCorrect ?? true) && (obraSocial.isCorrect ?? true) && (aportesSindical.isCorrect ?? true);
+
+  return {
+    pageNumber,
+    employeeName: data.employeeName || 'Nombre no identificado',
+    convenio: 'faatra',
+    totalHaberes,
+    totalNonRemunerative: totalNoRem,
+    jubilacion, ley19032, obraSocial,
+    aporteOsNoRem: { present: false },
+    aportesSindical,
+    faecys: { present: false },
+    cuotaSolidaridad: { present: false },
+    sepelioPresente: data.cod0334_sepelio != null,
+    aporteArt47: { present: false },
+    tieneOsecac: false,
+    esJornadaReducida,
+    isCorrect,
+    status: isCorrect ? 'success' : 'error',
+    skipped: false,
+  };
+};
+
+// ─── FARMACIA CCT 426/05 SF ──────────────────────────────────────────────────
+
+const FARMACIA_PROMPT = `Analizá este recibo de sueldo del CCT 426/05 Farmacia (Asociación Trabajadores de Farmacia de Santa Fe). Es una imagen de alta resolución.
+
+PASO 1: VERIFICAR JUBILACIÓN
+Buscá el código 0300 (JUBILACION). Si no existe, marcá hasJubilacion=false y no sigas.
+
+PASO 2: DATOS GENERALES
+- employeeName: nombre completo del empleado
+- totalHaberes: valor de "Total Haberes" (columna remunerativa)
+- totalNonRemunerative: valor de "Tot. Hab.s/Desc." o "Total No Remunerativo" (0 si no existe)
+- basicoSueldo: importe del concepto 0010 (Sueldo Mensual) o 0004 (Jornada Reducida). Es la base para calcular el 0339.
+
+PASO 3: TIPO DE JORNADA
+- esJornadaReducida: true si aparece código 0004. false si aparece 0010.
+
+PASO 4: EXTRAER DEDUCCIONES (null si no aparece en el recibo)
+- cod0300_jubilacion: importe del código 0300
+- cod0302_ley19032: importe del código 0302
+- cod0310_obraSocial: importe del código 0310
+- cod0322_aportesSindical: importe del código 0322
+- cod0339_aporteArt47: importe del código 0339
+
+FORMATO NUMÉRICO ARGENTINO:
+- El punto (.) separa miles: 1.000 = mil
+- La coma (,) separa decimales: 50,00 = cincuenta
+- Convertí "1.179.320,91" a 1179320.91 en el JSON
+- Si un campo no existe retornarlo como null
+`;
+
+const FARMACIA_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    hasJubilacion: { type: Type.BOOLEAN },
+    employeeName: { type: Type.STRING },
+    totalHaberes: { type: Type.NUMBER },
+    totalNonRemunerative: { type: Type.NUMBER },
+    basicoSueldo: { type: Type.NUMBER },
+    esJornadaReducida: { type: Type.BOOLEAN },
+    cod0300_jubilacion: { type: Type.NUMBER },
+    cod0302_ley19032: { type: Type.NUMBER },
+    cod0310_obraSocial: { type: Type.NUMBER },
+    cod0322_aportesSindical: { type: Type.NUMBER },
+    cod0339_aporteArt47: { type: Type.NUMBER },
+  },
+  required: ['hasJubilacion'],
+};
+
+const buildFarmaciaResult = (data: any, pageNumber: number): AuditResult => {
+  const totalHaberes = data.totalHaberes || 0;
+  const totalNoRem = data.totalNonRemunerative || 0;
+  const totalBase = totalHaberes + totalNoRem;
+  const basico = data.basicoSueldo || totalHaberes;
+  const esJornadaReducida: boolean = !!data.esJornadaReducida;
+
+  const jubilacion = validate(data.cod0300_jubilacion != null, data.cod0300_jubilacion || 0, Number((totalHaberes * 0.11).toFixed(2)));
+  const ley19032 = validate(data.cod0302_ley19032 != null, data.cod0302_ley19032 || 0, Number((totalHaberes * 0.03).toFixed(2)));
+  const obraSocial = validate(data.cod0310_obraSocial != null, data.cod0310_obraSocial || 0, Number((totalHaberes * 0.03).toFixed(2)));
+  // 0322 - Aporte Sindical: 3% rem + no rem
+  const aportesSindical = validate(data.cod0322_aportesSindical != null, data.cod0322_aportesSindical || 0, Number((totalBase * 0.03).toFixed(2)));
+  // 0339 - Aporte Art 47: 10% sobre básico
+  const aporteArt47 = validate(data.cod0339_aporteArt47 != null, data.cod0339_aporteArt47 || 0, Number((basico * 0.10).toFixed(2)));
+
+  const isZeroSalary = totalHaberes === 0;
+  const isCorrect = !isZeroSalary && (jubilacion.isCorrect ?? true) && (ley19032.isCorrect ?? true) && (obraSocial.isCorrect ?? true) && (aportesSindical.isCorrect ?? true) && (aporteArt47.isCorrect ?? true);
+
+  return {
+    pageNumber,
+    employeeName: data.employeeName || 'Nombre no identificado',
+    convenio: 'farmacia',
+    totalHaberes,
+    totalNonRemunerative: totalNoRem,
+    jubilacion, ley19032, obraSocial,
+    aporteOsNoRem: { present: false },
+    aportesSindical,
+    faecys: { present: false },
+    cuotaSolidaridad: { present: false },
+    sepelioPresente: false,
+    aporteArt47,
     tieneOsecac: false,
     esJornadaReducida,
     isCorrect,

@@ -1,5 +1,5 @@
 
-export type ConvenioType = 'comercio' | 'sanidad' | 'vigilancia';
+export type ConvenioType = 'comercio' | 'sanidad' | 'vigilancia' | 'faatra' | 'farmacia';
 
 export interface DeductionValidation {
   present: boolean;
@@ -26,6 +26,8 @@ export interface AuditResult {
   aportesSindical: DeductionValidation; // 0322 - 2% rem+noRem (Comercio)
   faecys: DeductionValidation;          // 0332 - 0.5% rem+noRem (Comercio)
   cuotaSolidaridad: DeductionValidation;// 0345 - 1% rem (Sanidad)
+  sepelioPresente: boolean;             // 0334 - monto fijo (FAATRA, solo verifica presencia)
+  aporteArt47: DeductionValidation;     // 0339 - 10% básico (Farmacia)
 
   // Metadata
   tieneOsecac: boolean;

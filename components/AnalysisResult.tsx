@@ -128,9 +128,20 @@ export const AnalysisResult: React.FC<Props> = ({ result }) => {
         <Row label="Cód. 0302 - Ley 19032 (3% rem)" v={result.ley19032} />
         <Row label={obraSocialLabel} v={result.obraSocial} />
         {result.tieneOsecac && <Row label={osNoRemLabel} v={result.aporteOsNoRem} />}
-        <Row label={`Cód. 0322 - Aporte Sindical (${result.convenio === 'vigilancia' ? '3%' : '2%'} rem${result.convenio === 'comercio' ? '+no rem' : ''})`} v={result.aportesSindical} />
+        <Row label={`Cód. 0322 - Aporte Sindical (${result.convenio === 'vigilancia' ? '3%' : result.convenio === 'faatra' ? '5%' : result.convenio === 'farmacia' ? '3%' : '2%'} rem${result.convenio === 'comercio' || result.convenio === 'faatra' || result.convenio === 'farmacia' ? '+no rem' : ''})`} v={result.aportesSindical} />
         <Row label="Cód. 0332 - FAECYS (0.5% rem+no rem)" v={result.faecys} />
         <Row label="Cód. 0345 - Cuota de Solidaridad (1% rem)" v={result.cuotaSolidaridad} />
+        {result.sepelioPresente && (
+          <div className="p-3 rounded-lg border bg-green-50 border-green-100">
+            <div className="flex justify-between items-center">
+              <span className="font-medium text-gray-800 text-sm">Cód. 0334 - Servicio de Sepelio</span>
+              <span className="text-xs font-bold text-green-700 bg-green-200 px-2 py-0.5 rounded flex items-center gap-1">
+                <CheckCircle2 size={12}/> Presente
+              </span>
+            </div>
+          </div>
+        )}
+        <Row label="Cód. 0339 - Aporte Art. 47 (10% básico)" v={result.aporteArt47} />
       </div>
 
       {isError && !isZeroSalary && (
