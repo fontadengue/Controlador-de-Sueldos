@@ -5,12 +5,12 @@ import { analyzeReceiptImage } from './services/geminiService';
 import { AuditResult, ProcessingState, ConvenioType } from './types';
 import { AnalysisResult } from './components/AnalysisResult';
 
-const CONVENIOS: { id: ConvenioType; label: string; description: string }[] = [
-  { id: 'comercio',   label: 'Empleados de Comercio',    description: 'CCT 130/75 — Jubilación, OS, Sindical 2%, FAECYS' },
-  { id: 'sanidad',    label: 'Empleados de Sanidad',      description: 'CCT 180/75 — Jubilación, OS, Cuota Solidaridad 1%' },
-  { id: 'vigilancia', label: 'Vigilancia Privada',        description: 'CCT 426/05 — Jubilación, OS, Sindical 3%' },
-  { id: 'faatra',     label: 'Talleres Automotores',      description: 'CCT 27/88 FAATRA-SMATA — Jubilación, OS, Sindical 5%' },
-  { id: 'farmacia',   label: 'Farmacia',                  description: 'CCT 426/05 SF — Jubilación, OS, Sindical 3%, Art.47 10%' },
+const CONVENIOS: { id: ConvenioType; label: string; description: string; color: string }[] = [
+  { id: 'comercio',   label: 'Empleados de Comercio',    description: 'CCT 130/75 — Jubilación, OS, Sindical 2%, FAECYS',          color: 'border-blue-400 hover:border-blue-500' },
+  { id: 'sanidad',    label: 'Empleados de Sanidad',      description: 'CCT 180/75 — Jubilación, OS, Cuota Solidaridad 1%',         color: 'border-green-400 hover:border-green-500' },
+  { id: 'vigilancia', label: 'Vigilancia Privada',        description: 'CCT 426/05 — Jubilación, OS, Sindical 3%',                  color: 'border-red-400 hover:border-red-500' },
+  { id: 'faatra',     label: 'Talleres Automotores',      description: 'CCT 27/88 FAATRA-SMATA — Jubilación, OS, Sindical 5%',      color: 'border-orange-400 hover:border-orange-500' },
+  { id: 'farmacia',   label: 'Farmacia',                  description: 'CCT 426/05 SF — Jubilación, OS, Sindical 3%, Art.47 10%',   color: 'border-purple-400 hover:border-purple-500' },
 ];
 
 const App: React.FC = () => {
@@ -115,7 +115,7 @@ const App: React.FC = () => {
                 <button
                   key={c.id}
                   onClick={() => setConvenio(c.id)}
-                  className="bg-white rounded-2xl border-2 border-gray-200 p-6 text-left hover:border-brand-500 hover:shadow-md transition-all group"
+                  className={`bg-white rounded-2xl border-2 ${c.color} p-6 text-left shadow-sm hover:shadow-md transition-all group`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="p-2 bg-brand-50 rounded-lg group-hover:bg-brand-100 transition-colors">
