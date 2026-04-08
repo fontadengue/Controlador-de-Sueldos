@@ -87,10 +87,12 @@ const App: React.FC = () => {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-brand-700">
-            <div className="h-10 w-10 rounded-full bg-gray-900 flex items-center justify-center border border-yellow-600 shadow-sm shrink-0">
-              <BarChart3 className="text-yellow-500 h-6 w-6" />
-            </div>
+          <div className="flex items-center gap-3">
+            <img
+              src="https://www.estudiodutto.com.ar/img/logoestudio.png"
+              alt="Estudio Dutto"
+              className="h-10 w-auto"
+            />
             <h1 className="text-xl font-bold tracking-tight">Auditador de Recibos de Sueldo</h1>
           </div>
           {convenio && (
